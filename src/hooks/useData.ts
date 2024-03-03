@@ -1,31 +1,57 @@
 import { useEffect, useState } from "react";
 
-const useData = <T>(endpoint: string) => {
+const useData = <T>(endpoint: string, requestConfig?: object, deps?: unknown[]) => {
     const [data, setData] = useState<T[]>([]);
     const [error, setError] = useState("");
     const [isLoading, setLoading] = useState(false);
 
     useEffect (() => {
-        const controller = new AbortController();
+        const fetchData = async () => {
+            try {
+                setLoading(true);
 
-        setLoading(true);
-        fetch("https://api.rawg.io/api" + endpoint + "?key=0de0dc61e00d4d6f8c278a8c38c1e83e&dates=2019-09-01,2019-09-30&platforms=18,1,7", {
-            signal: controller.signal,
-            method: "GET",
-            mode: "cors"
-        })
-            .then(response => {
-                if (response.ok) {
-                    return response.json();
+                const controller = new AbortController();
+
+                const url = new URL("https://api.rawg.io/api" + endpoint);
+                url.searchParams.append('key', '0de0dc61e00d4d6f8c278a8c38c1e83e');
+
+                if (requestConfig) {
+                    Object.entries(requestConfig).forEach(([k, v]) => {
+                        if(v !== undefined) {
+                            url.searchParams.append(k, String(v));
+                        }
+                    });
                 }
-                throw response;
-            })
-            .then(data => { setData(data.results); setLoading(false); })
-            .catch(err => { if(err.status) setError("Request failed with status code " + err.status); setLoading(false); })
-            return () => controller.abort();
-    }, []);
-    
-    return { data, error, isLoading }
+
+                const response = await fetch(url.toString(), {
+                    signal: controller.signal,
+                    method: "GET",
+                    mode: "cors"
+                });
+
+                if (response.ok) {
+                    const jsonData = await response.json();
+                    setData(jsonData.results);
+                } else {
+                    throw new Error(`Request failed with status code ${response.status}`);
+                }
+            } catch (error) {
+                setError(error.message || "An error occurred while fetching data.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+
+        return () => {
+            // Cleanup function to abort the fetch request if the component unmounts
+            const controller = new AbortController();
+            controller.abort();
+        };
+    }, deps ? [...deps] : []);
+
+    return { data, error, isLoading };
 };
 
 export default useData;

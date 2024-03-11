@@ -36,7 +36,8 @@ const useData = <T>(endpoint: string, requestConfig?: object, deps?: unknown[]) 
                     throw new Error(`Request failed with status code ${response.status}`);
                 }
             } catch (error) {
-                setError(error.message || "An error occurred while fetching data.");
+                if(error instanceof Error)
+                    setError(error.message || "An error occurred while fetching data.");
             } finally {
                 setLoading(false);
             }
